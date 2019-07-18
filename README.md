@@ -20,8 +20,8 @@
   -us --unshift [key] [value]  = -e [key] unshift [value]
 
   Examples:
-  env-mgr -e Path + 'D:\\DEV\\Android'      // path增加路径
-  env-mgr -e DEPOT_TOOLS_WIN_TOOLCHAIN = 0  // 设置值
+  env-mgr -e Path push 'D:\\DEV\\Android'     // path增加路径
+  env-mgr -e DEPOT_TOOLS_WIN_TOOLCHAIN set 0  // 设置值
 
 > echo 修改之后通过env-update更新环境变量
 > env-update
