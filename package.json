@@ -1,0 +1,37 @@
+{
+  "name": "windows-env-cli",
+  "version": "1.0.0",
+  "description": "windows环境变量配置工具",
+  "main": "out/main.js",
+  "bin": {
+    "env-mgr": "./lib/main.js",
+    "env-update": "./env-update.cmd"
+  },
+  "scripts": {
+    "dev": "tsc --watch",
+    "release": "tsc && minify lib -d lib --mergeVars --undefinedToVoid --infinity --mangle --simplify --memberExpressions --typeConstructors",
+    "test": "jest",
+    "run": "node lib/main",
+    "help": "node lib/main --help",
+    "list-all": "node lib/main --list",
+    "list-path": "node lib/main -l Path",
+    "list-path-ext": "node lib/main -l PATHEXT",
+    "list-windir": "node lib/main -l windir",
+    "edit-path-add": "node lib/main -e Path push 'D:\\DEV\\Github\\android'"
+  },
+  "keywords": [
+    "path",
+    "windows",
+    "环境变量"
+  ],
+  "author": "DeepKolos <deepkolos@qq.com>",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/jest": "^24.0.15",
+    "@types/node": "^12.6.6",
+    "babel-minify": "^0.5.0",
+    "jest": "^24.8.0",
+    "ts-jest": "^24.0.2",
+    "typescript": "^3.5.3"
+  }
+}
