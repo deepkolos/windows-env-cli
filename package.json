@@ -1,6 +1,6 @@
 {
   "name": "windows-env-cli",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "windows环境变量配置工具",
   "main": "out/main.js",
   "bin": {
