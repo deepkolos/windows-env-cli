@@ -1,176 +1,138 @@
 #!/usr/bin/env node
 
-import help from './help';
-import * as shell from 'child_process';
+import CLI from './cli';
+import { RegMgr } from './reg';
 
-const ENV_REG_PATH =
-  'HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment';
+const cli = new CLI();
+const regMgr = new RegMgr();
 
-(async function main() {
-  if (hasOption('--help')) return help();
+async function list(key?: string) {
+  const list = await regMgr.list(key);
 
-  const otherOptions = process.argv.slice(3);
-
-  const isSet = hasOption(['-s', '--set']);
-  const isEdit = hasOption(['-e', '--edit']);
-  const isList = hasOption(['-l', '--list']);
-  const isPush = hasOption(['-p', '--push']);
-  const isRemove = hasOption(['-r', '--remove']);
-  const isUnshift = hasOption(['-us', '--unshift']);
-  const isAddPath = hasOption(['-a', '--add-path']);
-  const isListPath = hasOption(['-lp', '--list-path']);
-
-  // 设置中文输出
-  await exec('chcp 65001');
-
-  if (isList || isListPath) {
-    if (isListPath) {
-      printItem(await getEnvItem('Path'));
-    } else if (otherOptions.length === 0) {
-      const list = await getEnvList();
-      printList(list);
-    } else {
-      const key = otherOptions.shift();
-
-      if (key) printItem(await getEnvItem(key));
-      else console.log('参数错误');
-    }
-    return;
-  }
-
-  if (isEdit || isAddPath || isUnshift || isRemove || isPush || isSet) {
-    let options = [...otherOptions];
-
-    if (isSet) options.splice(1, 0, 'set');
-    if (isPush) options.splice(1, 0, 'push');
-    if (isRemove) options.splice(1, 0, 'remove');
-    if (isUnshift) options.splice(1, 0, 'unshift');
-    if (isAddPath) options = ['Path', 'push', ...otherOptions];
-
-    const [key, operator, value, hasExpandString] = formatOptions(options);
-
-    try {
-      if (operator === 'set') {
-        const type = hasExpandString ? 'REG_EXPAND_SZ' : 'REG_SZ';
-        await exec(
-          `reg add "${ENV_REG_PATH}" /v ${key} /t ${type} /d ${value}`,
-        );
-      }
-
-      if (operator === 'push' || operator === 'unshift') {
-        const item = await getEnvItem(key);
-        if (item.values.includes(value)) {
-          item.values.splice(item.values.indexOf(value), 1);
-        }
-        item.values[operator](value);
-        await exec(
-          `reg add "${ENV_REG_PATH}" /f /v ${key} /t ${
-            item.type
-          } /d "${item.values.join(';')}"`,
-        );
-      }
-
-      if (operator === 'remove') {
-        key && (await exec(`reg delete "${ENV_REG_PATH}" /f /v ${key}`));
-      }
-
-      console.log('操作成功');
-    } catch (error) {
-      console.log('出错了:', error);
-    }
-    return;
-  }
-})();
-
-interface EnvItem {
-  key: string;
-  type: string;
-  value: string;
-  values: string[];
-}
-
-function hasOption(name: string | string[]) {
-  if (typeof name === 'string') {
-    return process.argv.includes(name);
-  } else {
-    return name.some(i => process.argv.includes(i));
-  }
-}
-
-function exec(cmd: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    shell.exec(cmd, (err, stdout, stderr) => {
-      if (err) reject(err);
-      else resolve(stdout);
-    });
-  });
-}
-
-function parseLine(line: string): EnvItem {
-  let [, key, type, value] = line.split('    ');
-
-  let values: string[] = [];
-  if (key === 'Path' || value.includes(';')) {
-    values = value.split(';').filter(i => i !== '');
-  }
-
-  return { key, type, value, values };
-}
-
-function formatValue(value: string): [string, boolean] {
-  const hasExpandString = /\%[^\%]*\%/i;
-  return [
-    value.replace(/^[\'\"]/, '').replace(/[\'\"]$/, ''),
-    hasExpandString.test(value),
-  ];
-}
-
-function formatOptions(options: string[]): [string, string, string, boolean] {
-  let key, value, valueRaw, operator, expand;
-  switch (options.length) {
-    case 2:
-      [key, valueRaw] = options;
-      [value, expand] = formatValue(valueRaw);
-      return [key, 'set', value, expand];
-    case 3:
-      [key, operator, valueRaw] = options;
-      [value, expand] = formatValue(valueRaw);
-      if (operator === 'push' || operator === 'set')
-        return [key, operator, value, expand];
-      else throw new Error('operator只能填写 =, +');
-    default:
-      throw new Error('参数填写错误');
-  }
-}
-
-function printList(list: EnvItem[]) {
-  list.forEach((item, i) => {
-    console.log(`[${i}] ${item.key}: ${item.value}`);
-  });
-}
-
-function printItem(item: EnvItem) {
-  if (item.values.length) {
-    console.log(`key: ${item.key}
+  if (list.length === 1) {
+    const item = list[0];
+    if (item.values.length) {
+      console.log(`key: ${item.key}
 type: ${item.type}
 values:
 ${item.values.map((v, i) => `[${i}] ${v}\n`).join('')}`);
-  } else {
-    console.log(`key: ${item.key}
+    } else {
+      console.log(`key: ${item.key}
 type: ${item.type}
 value: ${item.value}`);
+    }
+  } else {
+    list.forEach((item, i) => {
+      console.log(`[${i}] ${item.key}: ${item.value}`);
+    });
   }
 }
 
-async function getEnvList() {
-  const rawOutput = await exec(`reg query "${ENV_REG_PATH}"`);
-  const lines = rawOutput.split('\r\n').slice(2, -2);
-  const items = lines.map(parseLine);
-
-  return items;
+async function success() {
+  console.log('操作成功');
 }
 
-async function getEnvItem(key: string) {
-  const rawOutput = await exec(`reg query "${ENV_REG_PATH}" /v ${key}`);
-  return parseLine(rawOutput.replace(/\r\n/g, ''));
+async function edit({
+  key,
+  operator,
+  value,
+  index = -1,
+}: {
+  key: string;
+  operator: string;
+  value: string;
+  index?: number;
+}) {
+  switch (operator) {
+    case 'set':
+      return await regMgr.set(key, value).then(success);
+    case 'remove':
+      return await regMgr
+        .remove(key, value ? ~~value : undefined)
+        .then(success);
+    case 'push':
+      return await regMgr.push(key, value).then(success);
+    case 'unshift':
+      return await regMgr.unshift(key, value).then(success);
+    case 'replace':
+      return await regMgr.replace(key, index, value).then(success);
+  }
+
+  console.log('operator未识别');
 }
+
+const isWindows = !!~(process.env.OS || '').toLowerCase().indexOf('windows');
+
+if (isWindows) console.log('仅仅支持windows上使用');
+else
+  cli
+    .action('-h --help', '显示帮助', '', () => cli.help())
+    .action<{ key?: string }>(
+      '-l --list [?key]',
+      '列出环境变量',
+      '',
+      async ({ key }) => await list(key),
+    )
+    .action(
+      '-e --edit [key] [operator] [value]',
+      '编辑环境变量path路径',
+      '',
+      edit,
+    )
+
+    .action(
+      '-lp --list-path',
+      '= -l Path',
+      'Alias',
+      async () => await list('Path'),
+    )
+    .action<{ value: string }>(
+      '-a --add-path [value]',
+      '= -e Path push [value]',
+      'Alias',
+      ({ value }) => edit({ key: 'Path', operator: 'push', value }),
+    )
+    .action<{ key: string; value: string }>(
+      '-p --push [key] [value]',
+      '= -e [key] push [value]',
+      'Alias',
+      ({ key, value }) => edit({ key, operator: 'push', value }),
+    )
+    .action<{ key: string; value: string }>(
+      '-s --set [key] [value]',
+      '= -e [key] set [value]',
+      'Alias',
+      ({ key, value }) => edit({ key, operator: 'set', value }),
+    )
+    .action<{ key: string; value: string }>(
+      '-us --unshift [key] [value]',
+      '= -e [key] unshift [value]',
+      'Alias',
+      ({ key, value }) => edit({ key, operator: 'unshift', value }),
+    )
+    .action<{ key: string; index: string }>(
+      '-r --remove [key] [?index]',
+      '= -e [key] remove [?index]',
+      'Alias',
+      ({ key, index }) => edit({ key, operator: 'remove', value: index }),
+    )
+    .action<{ key: string; index: string; value: string }>(
+      '-rp --replace [key] [?index] [value]',
+      '= -e [key] replace [?index] [value]',
+      'Alias',
+      ({ key, index, value }) =>
+        edit({ key, operator: 'replace', value, index: ~~index }),
+    )
+
+    .action(
+      "env-mgr -e Path push 'D:\\DEV\\Android'",
+      '// path增加路径',
+      'Examples',
+    )
+    .action(
+      'env-mgr -e DEPOT_TOOLS_WIN_TOOLCHAIN set 0',
+      '// 设置值',
+      'Examples',
+    )
+
+    .run(process.argv.slice(2));

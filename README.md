@@ -8,6 +8,7 @@
 > echo 使用
 > env-mgr --help
 
+  -h --help                          展示帮助信息
   -l --list [?key]                   列出环境变量
   -e --edit [key] [operator] [value] 编辑环境变量path路径
                                      operator默认值 set 可选 set|push|unshift|remove
@@ -29,5 +30,7 @@
 
 # TODO
 
-0. 单元测试
-1. 支持删除 path
+0. 单元测试 √
+1. 支持删除 path replace √
+1. 错误处理 √
+1. OOP √
