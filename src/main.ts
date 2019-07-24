@@ -63,7 +63,7 @@ async function edit({
 
 const isWindows = !!~(process.env.OS || '').toLowerCase().indexOf('windows');
 
-if (isWindows) console.log('仅仅支持windows上使用');
+if (!isWindows) console.log('仅仅支持windows上使用');
 else
   cli
     .action('-h --help', '显示帮助', '', () => cli.help())
